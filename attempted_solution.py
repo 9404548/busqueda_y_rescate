@@ -53,7 +53,7 @@ def main():
     target_ori, target_pos, start_pos, ruta = None, None, None, []
 
     while estado != State.FINALIZADO:
-        pos, ori, dists = percibir_y_mapear(sim, robot, sen_us, grid)
+        giro_necesario, sentido_giro, avance_necesario, target_cardinal, target_posicion = percibir_y_mapear(sim, robot, sen_us, grid)
         obj_detectado, obj_pos = procesar_vision(sim, cam, h_obj)
         vl, vr = 0, 0
         if estado == State.EXPLORACION:
@@ -63,7 +63,7 @@ def main():
 
             estado = State.AGARRANDO
         elif estado == State.AGARRANDO:
-
+            ejecutar_agarre(sim, h_obj)
             estado = State.PLANIFICACION
         elif estado == State.PLANIFICACION:
 
@@ -72,7 +72,7 @@ def main():
 
             estado = State.SOLTANDO
         elif estado == State.SOLTANDO:
-
+            ejecutar_soltar(sim, h_obj)
             estado = State.FINALIZADO
         gestionar_movimientos(giro_necesario, sentido_giro, avance_necesario, target_cardinal, target_posicion)
 
@@ -85,8 +85,18 @@ def obtener_handles(sim):
            sim.getObject("/Objetivo")
     
 
-def percibir_y_mapear():
+def percibir_y_mapear(sim, handle_robot, us_sensores, mapa):
+    # leer posicion y orientacion del robot
+
+    # leer sensores de ultrasonido del robot
+
+    # con esa informacion, actualizar en el mapa las celdas ortogonalmente adyacentes
+
+    # con esa misma informacion, determinar el siguiente movimiento
+
+    return giro_necesario, sentido_giro, avance_necesario, target_cardinal, target_posicion
     
+
     pass
 
 def procesar_vision(sim, camara_handle, obj_handle):
@@ -108,3 +118,59 @@ def procesar_vision(sim, camara_handle, obj_handle):
     
 
 def gestionar_movimientos(giro_necesario, sentido_giro, avance_necesario, target_cardinal, target_posicion):
+    # if giro_necesario y sentido_giro = derecha y avance_necesario
+    # elif giro_necesario = no, y avance necesario, avanzar
+    # elif giro_necesario y sentido_giro = izquierda
+
+    # NOTA: en cada movimiento es necesario usar el target_cardinal y el target_posicion (segun aplique) y compararlos con la odometría del robot
+    # para ver si se ha realizado el movimiento correctamente usando: 
+    # leerOdometria(sim, robot) devuelve x, y, theta
+
+    pass
+
+def girar90grados(sim, robot, m_izq, m_der, sentido, target_cardinal):
+
+
+    pass
+
+def avanzar1metro(sim, robot, m_izq, m_der, target_posicion):
+
+
+    pass
+
+def calcular_dijkstra(grid, inicio, fin):
+    dist, prev, pq = {inicio: 0}, {}, [(0, inicio)]
+    while pq:
+        d, u = heapq.heappop(pq)
+        if u == fin: break
+        if d > dist.get(u, float('inf')): continue
+        r, c = u
+        for vr, vc in [(r-1, c), (r+1, c), (r, c-1), (r, c+1)]:
+            if 0 <= vr < C.DIMENSION_MAPA_GRID and 0 <= vc < C.DIMENSION_MAPA_GRID and grid[vr, vc] == C.GRID_FREE:
+                if (d + 1) < dist.get((vr, vc), float('inf')):
+                    dist[(vr, vc)], prev[(vr, vc)] = d + 1, u
+                    heapq.heappush(pq, (d + 1, (vr, vc)))
+    ruta = []; curr = fin
+    while curr in prev: ruta.append(curr); curr = prev[curr]
+    if ruta: ruta.append(inicio)
+    return ruta[::-1]
+
+def ejecutar_agarre(sim, h_obj):
+    sim.setObjectInt32Param(h_obj, 10, 0)
+    sim.setObjectPosition(h_obj, -1, [0, 0, 3.35])
+    print("\n[+] Objeto agarrado.")
+
+def ejecutar_soltar(sim, h_obj):
+    sim.setObjectInt32Param(h_obj, 10, 1)
+    print("\n[+] Objeto soltado en la base.")
+
+def mundo_a_grid(pos_mundo):
+    return int(pos_mundo[1] / C.TAMANO_CELDA) + C.CENTRO_MAPA, \
+           int(pos_mundo[0] / C.TAMANO_CELDA) + C.CENTRO_MAPA
+
+def grid_a_mundo(grid_pos):
+    r, c = grid_pos
+    return ((c - C.CENTRO_MAPA) * C.TAMANO_CELDA, (r - C.CENTRO_MAPA) * C.TAMANO_CELDA)
+
+if __name__ == "__main__":
+    main()
