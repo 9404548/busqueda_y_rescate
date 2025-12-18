@@ -87,9 +87,11 @@ def obtener_handles(sim):
 
 def percibir_y_mapear(sim, handle_robot, us_sensores, mapa):
     # leer posicion y orientacion del robot
+    x, y, theta = leer_odometria(sim, handle_robot)
 
     # leer sensores de ultrasonido del robot
-
+    left = sim.readProximitySensor(us_sensores[0])
+    right = 
     # con esa informacion, actualizar en el mapa las celdas ortogonalmente adyacentes
 
     # con esa misma informacion, determinar el siguiente movimiento
@@ -171,6 +173,11 @@ def mundo_a_grid(pos_mundo):
 def grid_a_mundo(grid_pos):
     r, c = grid_pos
     return ((c - C.CENTRO_MAPA) * C.TAMANO_CELDA, (r - C.CENTRO_MAPA) * C.TAMANO_CELDA)
+
+def leer_odometria(sim, handle_robot):
+    pos = sim.getObjectPosition(handle_robot)
+    theta = sim.getObjectOrientation(handle_robot)
+    return pos[0], pos[1], theta 
 
 if __name__ == "__main__":
     main()
