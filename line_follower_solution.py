@@ -44,6 +44,9 @@ def main():
     grid = np.full((C.DIMENSION_MAPA_GRID, C.DIMENSION_MAPA_GRID), C.GRID_UNKNOWN, dtype=np.int8)
     estado = State.EXPLORACION
     ruta_retorno = []
+    decision_pendiente = None
+    ejecutando_maniobra = False
+    saliendo_de_interseccion = False
     
     print(">>> INICIANDO LINETRACER: Modo Exploración")
 
@@ -66,6 +69,7 @@ def main():
         vl_rad, vr_rad = 0, 0
 
         if estado == State.EXPLORACION:
+
             # 1. PRIORIDAD: Objetivo Visto
             if obj_visto:
                 print(">>> ¡OBJETIVO LOCALIZADO!")
@@ -87,33 +91,43 @@ def main():
             # Una curva normal solo activaría (izq+cen) o (der+cen), pero raramente (izq+der).
             es_interseccion = cen and (izq or der)
 
-            if es_interseccion:
-                print(">>> Intersección (T) detectada. Girando Izquierda...")
-                
-                # PASO CRÍTICO: Avanzar para centrar las ruedas en el cruce.
-                # Si giras inmediatamente al detectar, la rueda golpea la esquina.
-                # Ajusta el 0.15 (distancia en metros) según el tamaño de tu robot.
-                maniobra_avanzar_un_poco(sim, m_izq, m_der, 0.05)
-                
-                # Giro de 90º (Mano izquierda)
-                maniobra_girar_90(sim, m_izq, m_der, 'der')
-                
+            es_interseccion = cen and (izq or der)
+
+            if es_interseccion and not saliendo_de_interseccion:
+                # Regla de la mano derecha: Derecha > Recto > Izquierda
+                if der:
+                    decision = 'der'
+                    print(">>> Intersección detectada: DERECHA")
+                elif izq:
+                    decision = 'izq'
+                    print(">>> Intersección detectada: IZQUIERDA")
+                else:
+                    decision = 'recto'
+                    print(">>> Intersección detectada: RECTO")
+
+                # Ejecutamos la maniobra COMPLETA (bloqueante)
+                maniobra_avanzar_un_poco(sim, m_izq, m_der, 10)
+
+                if decision == 'der':
+                    maniobra_girar_90(sim, m_izq, m_der, 'der')
+                elif decision == 'izq':
+                    maniobra_girar_90(sim, m_izq, m_der, 'izq')
+                # recto: no se gira
+
+                # Activamos el latch de salida de intersección
+                saliendo_de_interseccion = True
+                continue
+
+
             else:
-                # 4. SEGUIMIENTO DE LÍNEA (Lógica Suave)
+            # Si ya estamos centrados otra vez, liberamos el latch
+                if cen and not izq and not der:
+                    saliendo_de_interseccion = False
+
+                # Seguimiento de línea
                 lin_izq = C.NOMINAL_VEL_LINEAR
                 lin_der = C.NOMINAL_VEL_LINEAR
-                
-                # Si pierdo línea por un lado, freno esa rueda para corregir
-                if not izq:
-                    lin_izq = lin_izq * C.FACTOR_SLOW
-                if not der:
-                    lin_der = lin_der * C.FACTOR_SLOW
-                
-                # Nota: Ya no necesitamos el 'if not izq and not cen...' aquí
-                # porque eso ahora lo maneja la lógica de "Callejón Visual" arriba.
 
-                vl_rad = lin_izq * C.TO_ANGULAR
-                vr_rad = lin_der * C.TO_ANGULAR
 
         elif estado == State.AGARRANDO:
             ejecutar_agarre(sim, h_obj)
