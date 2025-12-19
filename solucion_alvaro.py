@@ -75,22 +75,28 @@ def main():
                 estado = State.AGARRANDO
                 continue # Saltar al siguiente ciclo para cambiar lógica
 
-            if izq and der:
+            if der:
                 maniobra_avanzar_un_poco(sim, m_izq, m_der, 0.2)
-                maniobra_girar_90(sim, m_izq, m_der, 'izq')
+                maniobra_girar_90(sim, m_izq, m_der, 'der')
+                continue
 
             elif (not izq and not cen and not der) or chocado:
                 print(">>> Fin de camino. Girando 180 grados.")
                 maniobra_choque_y_vuelta(sim, m_izq, m_der)
+                continue
             else:
-                lin_izq = C.NOMINAL_VEL_LINEAR
-                lin_der = C.NOMINAL_VEL_LINEAR
+                v_l = C.NOMINAL_VEL_LINEAR
+                v_r = C.NOMINAL_VEL_LINEAR
 
-                if not izq: lin_izq *= C.FACTOR_SLOW
-                if not der: lin_der *= C.FACTOR_SLOW
+                if not cen and izq:
+                    v_l *= C.FACTOR_SLOW
+                
+                elif izq:
+                    v_l *= 0.6
+                
+                vl_rad = v_l * C.TO_ANGULAR
+                vr_rad = v_r * C.TO_ANGULAR
 
-                vl_rad = lin_izq * C.TO_ANGULAR
-                vr_rad = lin_der * C.TO_ANGULAR
 
 
 
