@@ -66,61 +66,52 @@ def main():
         vl_rad, vr_rad = 0, 0
 
         if estado == State.EXPLORACION:
-            # CONDICIÓN DE ÉXITO: Ver el objetivo
+            # 1. PRIORIDAD: Objetivo Visto
             if obj_visto:
-                print(">>> ¡OBJETIVO LOCALIZADO! Deteniendo para agarrar.")
-                vl_rad, vr_rad = 0, 0
+                print(">>> ¡OBJETIVO LOCALIZADO!")
                 sim.setJointTargetVelocity(m_izq, 0)
                 sim.setJointTargetVelocity(m_der, 0)
                 estado = State.AGARRANDO
-                continue # Saltar al siguiente ciclo para cambiar lógica
+                continue 
 
-            if chocado:
-                print(">>> ¡CHOQUE DETECTADO! Es un callejón sin salida.")
-                # Lógica de rebote: Retroceder y dar media vuelta
-                maniobra_choque_y_vuelta(sim, m_izq, m_der)
-            # LÓGICA DE NAVEGACIÓN (ÁRBOL)
-            # Caso 1: INTERSECCIÓN (Izquierda + Derecha + Centro o variantes)
-            # En un laberinto perfecto, T suele ser Izq+Cen+Der o Izq+Cen
-            es_interseccion = (izq and der)
+            # 2. PRIORIDAD: Callejón sin salida (VISUAL)
+            # Si NINGÚN sensor ve negro, se acabó el camino.
+            es_callejon_visual = (not izq and not cen and not der)
             
-            # Caso 2: CALLEJÓN SIN SALIDA (Todo blanco)
-            
+            if es_callejon_visual:
+                maniobra_retorno_visual(sim, m_izq, m_der)
+                continue # Saltamos el resto para no confundir la lógica
+
+            # 3. PRIORIDAD: Intersección (ESTRICTA)
+            # Exigimos que AMBOS laterales vean negro. Esto confirma una T o Cruz.
+            # Una curva normal solo activaría (izq+cen) o (der+cen), pero raramente (izq+der).
+            es_interseccion = cen and (izq or der)
 
             if es_interseccion:
-                # ESTRATEGIA: "Mano Izquierda" (Prioridad: Izq -> Recto -> Der)
-                # Avanzamos un poco para centrar el eje de ruedas en el cruce
-                maniobra_avanzar_un_poco(sim, m_izq, m_der, 0.2)
+                print(">>> Intersección (T) detectada. Girando Izquierda...")
                 
-                # Giramos 90 grados a la izquierda ciegamente
-                maniobra_girar_90(sim, m_izq, m_der, 'izq')
+                # PASO CRÍTICO: Avanzar para centrar las ruedas en el cruce.
+                # Si giras inmediatamente al detectar, la rueda golpea la esquina.
+                # Ajusta el 0.15 (distancia en metros) según el tamaño de tu robot.
+                maniobra_avanzar_un_poco(sim, m_izq, m_der, 0.05)
+                
+                # Giro de 90º (Mano izquierda)
+                maniobra_girar_90(sim, m_izq, m_der, 'der')
                 
             else:
-                # 4. SEGUIMIENTO DE LÍNEA (Lógica exacta del script Lua)
-                # Velocidad lineal base
+                # 4. SEGUIMIENTO DE LÍNEA (Lógica Suave)
                 lin_izq = C.NOMINAL_VEL_LINEAR
                 lin_der = C.NOMINAL_VEL_LINEAR
                 
-                # Si sensor izquierdo NO ve línea (false), frenar rueda izquierda
-                # Esto causa un giro suave a la izquierda para recuperar la línea
+                # Si pierdo línea por un lado, freno esa rueda para corregir
                 if not izq:
                     lin_izq = lin_izq * C.FACTOR_SLOW
-                
-                # Si sensor derecho NO ve línea (false), frenar rueda derecha
                 if not der:
                     lin_der = lin_der * C.FACTOR_SLOW
-
-                # Si el sensor central pierde la línea pero no los laterales (hueco o curva rara),
-                # la lógica de arriba sigue funcionando bien.
                 
-                # Si NINGUNO ve línea (0-0-0), el script Lua frenaría ambos.
-                # Nosotros añadimos seguridad: si perdemos línea por completo, es un final de camino lógico
-                # (aunque preferimos usar el choque físico, esto es backup)
-                if not izq and not der and not cen:
-                    # Opcional: Activar maniobra de vuelta si no hay colisión pero se acabó la línea
-                    pass 
+                # Nota: Ya no necesitamos el 'if not izq and not cen...' aquí
+                # porque eso ahora lo maneja la lógica de "Callejón Visual" arriba.
 
-                # Conversión final a radianes/segundo para los motores
                 vl_rad = lin_izq * C.TO_ANGULAR
                 vr_rad = lin_der * C.TO_ANGULAR
 
@@ -167,12 +158,11 @@ def main():
     sim.stopSimulation()
 
 # ==============================================================================
-#  FUNCIONES DE APOYO (REVISADAS)
+#  FUNCIONES DE APOYO
 # ==============================================================================
 
 def obtener_handles(sim):
-    """Adaptado para LineTracer en CoppeliaSim."""
-    robot = sim.getObject("/LineTracer") # Ajusta el nombre si es distinto
+    robot = sim.getObject("/LineTracer")
     m_izq = sim.getObject("/LineTracer/DynamicLeftJoint")
     m_der = sim.getObject("/LineTracer/DynamicRightJoint")
     # Sensores de visión mirando al suelo (Left, Middle, Right)
@@ -226,8 +216,6 @@ def percibir_y_mapear(pos_mundo, grid):
 
 def maniobra_girar_90(sim, mi, md, sentido):
     """Giro ciego de 90 grados (bloqueante o por tiempo)"""
-    # Para simplificar en simulación step-by-step, usaremos un bucle rápido
-    # En un robot real esto se hace con encoders o giroscopio
     vel = C.VEL_GIRO_RAD
     if sentido == 'izq': v_l, v_r = -vel, vel
     else: v_l, v_r = vel, -vel
@@ -242,37 +230,74 @@ def maniobra_girar_90(sim, mi, md, sentido):
 def maniobra_girar_180(sim, mi, md):
     maniobra_choque_y_vuelta(sim, mi, md)
 
-def maniobra_choque_y_vuelta(sim, mi, md):
+def maniobra_retorno_visual(sim, mi, md):
     """
-    Secuencia para salir de un callejón tras colisión:
-    1. Parar.
-    2. Retroceder (despegarse de la pared).
-    3. Girar 180º.
+    Se ejecuta cuando se acaba la línea (suelo blanco).
+    Gira 180 grados limpiamente sin chocar.
     """
-    # 1. Frenar en seco
+    print(">>> [VISUAL] Fin de camino detectado. Dando media vuelta...")
+    
+    # 1. Frenar
     sim.setJointTargetVelocity(mi, 0)
     sim.setJointTargetVelocity(md, 0)
-    sim.step() # Un paso para aplicar freno
+    # Pequeña pausa para estabilizar
+    for _ in range(100): sim.step()
     
-    # 2. Retroceder (Velocidad negativa)
-    sim.setJointTargetVelocity(mi, -2.0)
-    sim.setJointTargetVelocity(md, -2.0)
-    
-    # Retrocedemos durante unos ciclos (ej. 15 steps)
-    for _ in range(15):
-        sim.step()
+    # 2. Giro de 180 grados (Sobre su propio eje)
+    # Nota: Ya no hace falta retroceder porque no nos hemos chocado contra nada.
     sim.setJointTargetVelocity(mi, -C.VEL_GIRO_RAD)
     sim.setJointTargetVelocity(md, C.VEL_GIRO_RAD)
-    for _ in range(32): sim.step()
+    
+    for _ in range(350): sim.step()
+    
+    # 3. Avanzar un poquito para 'reencontrar' la línea si quedó entre sensores
+    vel_fwd = C.NOMINAL_VEL_LINEAR * C.TO_ANGULAR
+    sim.setJointTargetVelocity(mi, vel_fwd)
+    sim.setJointTargetVelocity(md, vel_fwd)
+    for _ in range(50): sim.step()
+
+    print(">>> [VISUAL] Recuperación completada.")
+
+def maniobra_choque_y_vuelta(sim, mi, md):
+    """
+    Solución al fallo de retroceso: Aumentamos velocidad y ajustamos tiempos.
+    """
+    print(">>> [FÍSICA] Iniciando protocolo de despegue...")
+    
+    # 1. PARADA TÉCNICA (Calmar físicas)
+    sim.setJointTargetVelocity(mi, 0)
+    sim.setJointTargetVelocity(md, 0)
+    for _ in range(100): sim.step()
+    
+    # 2. RETROCESO POTENTE (Fix: Usar TO_ANGULAR)
+    # Usamos 0.2 m/s hacia atrás. 
+    # 0.2 * 37 = 7.4 rad/s (Mucho más fuerte que el 2.0 anterior)
+    vel_back = -0.2 * C.TO_ANGULAR 
+    
+    sim.setJointTargetVelocity(mi, vel_back)
+    sim.setJointTargetVelocity(md, vel_back)
+    
+    # Tiempo: 40 steps son aprox 2 segundos (suficiente para despegarse)
+    for _ in range(40):
+        sim.step()
         
-    # 3. Media Vuelta (Giro 180)
-    maniobra_girar_180(sim, mi, md)
+    # 3. GIRO 180 (Usando tu velocidad configurada)
+    print(">>> [FÍSICA] Girando...")
+    sim.setJointTargetVelocity(mi, -C.VEL_GIRO_RAD)
+    sim.setJointTargetVelocity(md, C.VEL_GIRO_RAD)
+    
+    for _ in range(350): sim.step()
+
+    # 4. Parada final para estabilizar antes de seguir
+    sim.setJointTargetVelocity(mi, 0)
+    sim.setJointTargetVelocity(md, 0)
+    for _ in range(100): sim.step()
 
 def maniobra_avanzar_un_poco(sim, mi, md, tiempo_o_dist):
     """Avanzar ciego para cruzar la intersección"""
     vel_rad = C.NOMINAL_VEL_LINEAR * C.TO_ANGULAR
-    sim.setJointTargetVelocity(mi, C.vel_rad)
-    sim.setJointTargetVelocity(md, C.vel_rad)
+    sim.setJointTargetVelocity(mi, vel_rad)
+    sim.setJointTargetVelocity(md, vel_rad)
     for _ in range(int(tiempo_o_dist * 20)): 
         sim.step()
 
