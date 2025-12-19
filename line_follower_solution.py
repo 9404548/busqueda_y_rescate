@@ -17,7 +17,7 @@ class C:
     VEL_GIRO = 2.0         # Velocidad para maniobras
     KP_LINEA = 1.5         # Ganancia para seguir línea (ajustar si oscila)
     
-    # --- Visión Objetivo ---
+    # ---- Visión Objetivo ----
     AREA_MINIMA_DETECCION = 200
     LOWER_GREEN_HSV = np.array([40, 50, 50])
     UPPER_GREEN_HSV = np.array([80, 255, 255])
