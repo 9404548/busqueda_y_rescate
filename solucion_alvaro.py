@@ -205,8 +205,8 @@ def maniobra_girar_90(sim, mi, md, sentido):
     # Para simplificar en simulación step-by-step, usaremos un bucle rápido
     # En un robot real esto se hace con encoders o giroscopio
     vel = C.VEL_GIRO_RAD
-    if sentido == 'izq': v_l, v_r = -vel, vel
-    else: v_l, v_r = vel, -vel
+    if sentido == 'izq': v_l, v_r = vel, -vel
+    else: v_l, v_r = -vel, vel
     
     sim.setJointTargetVelocity(mi, v_l)
     sim.setJointTargetVelocity(md, v_r)
