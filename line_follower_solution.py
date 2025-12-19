@@ -48,7 +48,7 @@ def main():
     ejecutando_maniobra = False
     saliendo_de_interseccion = False
     
-    print(">>> INICIANDO LINETRACER: Modo Exploración")
+    print("INICIANDO BÚSQUEDA: Modo Exploración")
 
     while estado != State.FINALIZADO:
         # A. PERCEPCIÓN
@@ -72,7 +72,7 @@ def main():
 
             # 1. PRIORIDAD: Objetivo Visto
             if obj_visto:
-                print(">>> ¡OBJETIVO LOCALIZADO!")
+                print("¡OBJETIVO LOCALIZADO!")
                 sim.setJointTargetVelocity(m_izq, 0)
                 sim.setJointTargetVelocity(m_der, 0)
                 estado = State.AGARRANDO
@@ -97,13 +97,13 @@ def main():
                 # Regla de la mano derecha: Derecha > Recto > Izquierda
                 if der:
                     decision = 'der'
-                    print(">>> Intersección detectada: DERECHA")
+                    print("Intersección detectada: DERECHA")
                 elif izq:
                     decision = 'izq'
-                    print(">>> Intersección detectada: IZQUIERDA")
+                    print("Intersección detectada: IZQUIERDA")
                 else:
                     decision = 'recto'
-                    print(">>> Intersección detectada: RECTO")
+                    print("Intersección detectada: RECTO")
 
                 # Ejecutamos la maniobra COMPLETA (bloqueante)
                 maniobra_avanzar_un_poco(sim, m_izq, m_der, 10)
@@ -148,16 +148,14 @@ def main():
                 estado = State.RETORNO
 
         elif estado == State.RETORNO:
-            # Aquí ya NO usamos la línea roja obligatoriamente, usamos odometría pura
-            # o una mezcla híbrida. Para simplificar, usaremos la función de ir a waypoint.
+            # Aquí ya NO usamos la línea roja obligatoriamente, usamos
+            # una mezcla híbrida. Para simplificar, usaremos la función de ir a waypoint.
             if not ruta_retorno:
                 estado = State.SOLTANDO
             else:
-                # Lógica de ir al punto (extraída de tu código anterior o simplificada)
+                # Lógica de ir al punto
                 target = ruta_retorno[0]
                 vl_rad, vr_rad = comportamiento_seguir_ruta(pos_actual, sim.getObjectOrientation(robot, sim.handle_world)[2], ruta_retorno)
-                # ... Lógica de Pure Pursuit ...
-                # Si llegamos: ruta_retorno.pop(0)
                 pass 
 
         elif estado == State.SOLTANDO:
@@ -212,7 +210,6 @@ def leer_sensores_linea(sim, sensores):
             # Caso C: Retorno inesperado (por seguridad)
             res = 0
         # Asumimos que el sensor está configurado para devolver res=1 sobre la línea
-        # O podemos usar la intensidad: si intensidad < 0.5 es linea negra/roja
         detectado = (res == 1) 
         lecturas.append(detectado)
         
@@ -237,7 +234,7 @@ def maniobra_girar_90(sim, mi, md, sentido):
     sim.setJointTargetVelocity(mi, v_l)
     sim.setJointTargetVelocity(md, v_r)
     
-    # Esperar tiempo equivalente a 90 grados (Ajustar empíricamente '20' steps)
+    # Esperar tiempo equivalente a 90 grados
     for _ in range(16): 
         sim.step()
 
@@ -249,7 +246,7 @@ def maniobra_retorno_visual(sim, mi, md):
     Se ejecuta cuando se acaba la línea (suelo blanco).
     Gira 180 grados limpiamente sin chocar.
     """
-    print(">>> [VISUAL] Fin de camino detectado. Dando media vuelta...")
+    print(" [VISUAL] Fin de camino detectado. Dando media vuelta...")
     
     # 1. Frenar
     sim.setJointTargetVelocity(mi, 0)
@@ -258,7 +255,6 @@ def maniobra_retorno_visual(sim, mi, md):
     for _ in range(100): sim.step()
     
     # 2. Giro de 180 grados (Sobre su propio eje)
-    # Nota: Ya no hace falta retroceder porque no nos hemos chocado contra nada.
     sim.setJointTargetVelocity(mi, -C.VEL_GIRO_RAD)
     sim.setJointTargetVelocity(md, C.VEL_GIRO_RAD)
     
@@ -270,13 +266,13 @@ def maniobra_retorno_visual(sim, mi, md):
     sim.setJointTargetVelocity(md, vel_fwd)
     for _ in range(50): sim.step()
 
-    print(">>> [VISUAL] Recuperación completada.")
+    print(" [VISUAL] Recuperación completada.")
 
 def maniobra_choque_y_vuelta(sim, mi, md):
     """
     Solución al fallo de retroceso: Aumentamos velocidad y ajustamos tiempos.
     """
-    print(">>> [FÍSICA] Iniciando protocolo de despegue...")
+    print(" [FÍSICA] Iniciando protocolo de despegue...")
     
     # 1. PARADA TÉCNICA (Calmar físicas)
     sim.setJointTargetVelocity(mi, 0)
@@ -315,7 +311,6 @@ def maniobra_avanzar_un_poco(sim, mi, md, tiempo_o_dist):
     for _ in range(int(tiempo_o_dist * 20)): 
         sim.step()
 
-# --- REUTILIZABLES DE TU CÓDIGO ---
 def mundo_a_grid(pos_mundo):
     c = int(pos_mundo[0] / C.TAMANO_CELDA) + C.CENTRO_MAPA
     r = int(pos_mundo[1] / C.TAMANO_CELDA) + C.CENTRO_MAPA
@@ -421,7 +416,7 @@ def comportamiento_seguir_ruta(pos_actual, ori_actual, ruta):
     v = 0.2 # Velocidad retorno moderada
     
     # Convertir a velocidad ruedas (aprox para diferencial)
-    # v = (vl + vr)/2 * r ... simplificamos
+    # v = (vl + vr)/2 * r
     vl = (v - w*0.1) * C.TO_ANGULAR
     vr = (v + w*0.1) * C.TO_ANGULAR
     
