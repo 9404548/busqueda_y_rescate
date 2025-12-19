@@ -131,12 +131,35 @@ def gestionar_movimientos(giro_necesario, sentido_giro, avance_necesario, target
     pass
 
 def girar90grados(sim, robot, m_izq, m_der, sentido, target_cardinal):
+    x, y, theta = leer_odometria(sim, robot)
+    error = target_cardinal - theta 
 
+    while
 
     pass
 
 def avanzar1metro(sim, robot, m_izq, m_der, target_posicion):
+    x, y, _ = leer_odometria(sim, robot)
+    dx = target_posicion[0] - x
+    dy = target_posicion[1] - y
+    distancia = math.hypot(dx, dy)
 
+    while distancia > C.TOLERANCIA_POSICION:
+        x, y, _ = leer_odometria(sim, robot)
+        dx = target_posicion[0] - x
+        dy = target_posicion[1] - y
+        distancia = math.hypot(dx, dy)
+
+        velocidad = C.KP_AVANCE * distancia
+        velocidad = min(velocidad, 2.0)
+
+        sim.setJointTargetVelocity(m_izq, velocidad)
+        sim.setJointTargetVelocity(m_der, velocidad)
+
+        sim.step()
+    
+    sim.setJointTargetVelocity(m_izq, 0)
+    sim.setJointTargetVelocity(m_der, 0)
 
     pass
 
